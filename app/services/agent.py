@@ -105,13 +105,14 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": "get_row_count",
-                    "description": "Get total number of rows from a table",
+                    "description": "Get total number of rows from a table. Use this when user asks 'Nechta foydalanuvchi bor?', 'Jami nechta buyurtma?', 'Nechta savdo bor?' or similar questions about counting records.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "table": {
                                 "type": "string",
-                                "enum": ["users", "orders", "sales"]
+                                "enum": ["users", "orders", "sales"],
+                                "description": "Table name: 'users' for foydalanuvchilar, 'orders' for buyurtmalar, 'sales' for savdolar"
                             }
                         },
                         "required": ["table"]
@@ -122,19 +123,21 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": "get_recent_records",
-                    "description": "Get most recent records from a table",
+                    "description": "Get most recent records from a table. Use this when user asks 'Oxirgi 10 ta buyurtma', 'So'nggi savdolar', 'Eng yangi yozuvlar' or similar questions about recent records.",
                     "parameters": {
                         "type": "object",
                         "properties": {
                             "table": {
                                 "type": "string",
-                                "enum": ["orders", "sales"]
+                                "enum": ["orders", "sales"],
+                                "description": "Table name: 'orders' for buyurtmalar, 'sales' for savdolar"
                             },
                             "limit": {
                                 "type": "integer",
                                 "default": 5,
                                 "minimum": 1,
-                                "maximum": 100
+                                "maximum": 100,
+                                "description": "Number of records to return (nechta yozuv)"
                             }
                         },
                         "required": ["table"]
@@ -145,7 +148,7 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": "get_sales_stats",
-                    "description": "Get aggregated sales statistics",
+                    "description": "Get aggregated sales statistics including total sales, average sales, and maximum sale. Use this when user asks 'Savdo statistikasi', 'Daromad ma'lumotlari', 'Savdo ko'rsatkichlari' or similar questions about sales statistics.",
                     "parameters": {
                         "type": "object",
                         "properties": {}
@@ -161,10 +164,14 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
                     {
                         "role": "system",
                         "content": (
-                            "You are a data analytics assistant. "
+                            "You are a data analytics assistant that understands and responds in Uzbek language. "
+                            "You must understand questions in Uzbek (O'zbek tili) and respond in Uzbek. "
                             "You must NOT access database directly. "
                             "You must use provided tools to answer questions. "
-                            "Always provide clear and helpful responses based on the data you receive."
+                            "Always provide clear and helpful responses in Uzbek language based on the data you receive. "
+                            "When users ask questions in Uzbek like 'Nechta foydalanuvchi bor?' or 'Oxirgi 10 ta buyurtma', "
+                            "understand them correctly and use the appropriate tools. "
+                            "Respond in Uzbek language, using proper Uzbek grammar and terminology."
                         )
                     },
                     {"role": "user", "content": sanitized_message}
