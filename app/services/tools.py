@@ -47,8 +47,12 @@ def get_recent_records(db: Session, table: str, limit: int = 10):
 
 
 def get_sales_stats(db: Session):
+    total = db.query(func.sum(models.Sale.revenue)).scalar() or 0
+    avg = db.query(func.avg(models.Sale.revenue)).scalar() or 0
+    max_sale = db.query(func.max(models.Sale.revenue)).scalar() or 0
+    
     return {
-        "total_sales": db.query(func.sum(models.Sale.revenue)).scalar(),
-        "avg_sales": db.query(func.avg(models.Sale.revenue)).scalar(),
-        "max_sale": db.query(func.max(models.Sale.revenue)).scalar()
+        "total_sales": float(total),
+        "avg_sales": float(avg),
+        "max_sale": float(max_sale)
     }

@@ -63,6 +63,9 @@ async function sendMessage() {
         // Remove loading message
         removeMessage(loadingId);
 
+        // Debug logging
+        console.log('Response data:', data);
+
         if (data.error) {
             addMessage('bot', `Xato: ${data.error}`);
             showError(data.error);
@@ -79,11 +82,15 @@ async function sendMessage() {
             }
             addMessage('bot', botMessage || 'Javob olingan');
 
-            // Show visualization
-            if (data.visualization) {
+            // Show visualization - prioritize visualization object
+            if (data.visualization && data.visualization.type) {
+                console.log('Displaying visualization:', data.visualization);
                 displayVisualization(data.visualization, data.result);
-            } else if (data.result) {
+            } else if (data.result !== undefined && data.result !== null) {
+                console.log('Displaying result:', data.result);
                 displayResult(data.result, data.tool_used);
+            } else {
+                console.log('No visualization or result to display');
             }
         }
     } catch (error) {
@@ -123,73 +130,123 @@ function removeMessage(id) {
 }
 
 function displayVisualization(visualization, result) {
+    if (!visualization || !visualization.type) {
+        console.error('Invalid visualization object:', visualization);
+        return;
+    }
+
     visualizationContainer.innerHTML = '';
 
     if (visualization.type === 'stat') {
         const statCard = document.createElement('div');
         statCard.className = 'stat-card';
+        const value = result !== undefined ? result : (visualization.value !== undefined ? visualization.value : 'N/A');
         statCard.innerHTML = `
             <div class="stat-label">Jami qatorlar</div>
-            <div class="stat-value">${result}</div>
+            <div class="stat-value">${value}</div>
         `;
         visualizationContainer.appendChild(statCard);
     } else if (visualization.type === 'table') {
-        const table = createTable(visualization.data, visualization.columns);
-        visualizationContainer.appendChild(table);
+        if (visualization.data && Array.isArray(visualization.data) && visualization.data.length > 0) {
+            const table = createTable(visualization.data, visualization.columns || Object.keys(visualization.data[0]));
+            visualizationContainer.appendChild(table);
+        } else {
+            visualizationContainer.innerHTML = '<div class="placeholder">Ma\'lumot topilmadi</div>';
+        }
     } else if (visualization.type === 'chart') {
         const canvas = document.createElement('canvas');
         canvas.id = 'resultChart';
-        visualizationContainer.appendChild(canvas);
+        const chartDiv = document.createElement('div');
+        chartDiv.className = 'chart-container';
+        chartDiv.appendChild(canvas);
+        visualizationContainer.appendChild(chartDiv);
         
         // Destroy previous chart
         if (currentChart) {
             currentChart.destroy();
+            currentChart = null;
         }
         
-        currentChart = new Chart(canvas, {
-            type: visualization.chart_type || 'bar',
-            data: {
-                labels: visualization.labels,
-                datasets: [{
-                    label: 'Qiymat',
-                    data: visualization.values,
-                    backgroundColor: [
-                        'rgba(102, 126, 234, 0.8)',
-                        'rgba(118, 75, 162, 0.8)',
-                        'rgba(255, 99, 132, 0.8)',
-                        'rgba(54, 162, 235, 0.8)',
-                    ],
-                    borderColor: [
-                        'rgba(102, 126, 234, 1)',
-                        'rgba(118, 75, 162, 1)',
-                        'rgba(255, 99, 132, 1)',
-                        'rgba(54, 162, 235, 1)',
-                    ],
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
+        // Prepare data
+        const labels = visualization.labels || [];
+        const values = visualization.values || [];
+        
+        if (labels.length === 0 || values.length === 0) {
+            visualizationContainer.innerHTML = '<div class="placeholder">Grafik uchun ma\'lumot yetarli emas</div>';
+            return;
+        }
+        
+        try {
+            currentChart = new Chart(canvas, {
+                type: visualization.chart_type || 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Qiymat',
+                        data: values,
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(255, 99, 132, 0.8)',
+                            'rgba(54, 162, 235, 0.8)',
+                            'rgba(255, 206, 86, 0.8)',
+                        ],
+                        borderColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(118, 75, 162, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.error('Chart creation error:', error);
+            visualizationContainer.innerHTML = '<div class="error-message">Grafik yaratishda xato: ' + error.message + '</div>';
+        }
+    } else {
+        console.warn('Unknown visualization type:', visualization.type);
+        visualizationContainer.innerHTML = '<div class="placeholder">Noma\'lum vizualizatsiya turi</div>';
     }
 }
 
 function displayResult(result, toolUsed) {
     visualizationContainer.innerHTML = '';
 
+    if (result === null || result === undefined) {
+        visualizationContainer.innerHTML = '<div class="placeholder">Ma\'lumot topilmadi</div>';
+        return;
+    }
+
     if (typeof result === 'number') {
         const statCard = document.createElement('div');
         statCard.className = 'stat-card';
         statCard.innerHTML = `
             <div class="stat-label">${toolUsed || 'Natija'}</div>
-            <div class="stat-value">${result}</div>
+            <div class="stat-value">${result.toLocaleString()}</div>
         `;
         visualizationContainer.appendChild(statCard);
     } else if (Array.isArray(result)) {
@@ -200,10 +257,15 @@ function displayResult(result, toolUsed) {
         } else {
             visualizationContainer.innerHTML = '<div class="placeholder">Ma\'lumot topilmadi</div>';
         }
-    } else if (typeof result === 'object') {
+    } else if (typeof result === 'object' && result !== null) {
         // Display as key-value pairs or chart
         const keys = Object.keys(result);
         const values = Object.values(result);
+        
+        if (keys.length === 0) {
+            visualizationContainer.innerHTML = '<div class="placeholder">Bo\'sh ma\'lumot</div>';
+            return;
+        }
         
         if (keys.length <= 4) {
             // Show as stat cards
@@ -211,39 +273,54 @@ function displayResult(result, toolUsed) {
                 const statCard = document.createElement('div');
                 statCard.className = 'stat-card';
                 statCard.style.marginBottom = '15px';
+                const value = values[index];
                 statCard.innerHTML = `
-                    <div class="stat-label">${key}</div>
-                    <div class="stat-value">${formatValue(values[index])}</div>
+                    <div class="stat-label">${key.replace('_', ' ')}</div>
+                    <div class="stat-value">${formatValue(value)}</div>
                 `;
                 visualizationContainer.appendChild(statCard);
             });
         } else {
             // Show as chart
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart-container';
             const canvas = document.createElement('canvas');
             canvas.id = 'resultChart';
-            visualizationContainer.appendChild(canvas);
+            chartDiv.appendChild(canvas);
+            visualizationContainer.appendChild(chartDiv);
             
             if (currentChart) {
                 currentChart.destroy();
+                currentChart = null;
             }
             
-            currentChart = new Chart(canvas, {
-                type: 'bar',
-                data: {
-                    labels: keys,
-                    datasets: [{
-                        label: 'Qiymat',
-                        data: values.map(v => typeof v === 'number' ? v : 0),
-                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
-                        borderColor: 'rgba(102, 126, 234, 1)',
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
+            try {
+                currentChart = new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: keys,
+                        datasets: [{
+                            label: 'Qiymat',
+                            data: values.map(v => typeof v === 'number' ? v : 0),
+                            backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                            borderColor: 'rgba(102, 126, 234, 1)',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Chart creation error:', error);
+                visualizationContainer.innerHTML = '<div class="error-message">Grafik yaratishda xato</div>';
+            }
         }
     } else {
         visualizationContainer.innerHTML = `<div class="placeholder">${result}</div>`;
