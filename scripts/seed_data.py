@@ -28,12 +28,34 @@ PRODUCTS = [
 def seed():
     db: Session = SessionLocal()
     
-    # Clear existing data
+    # Clear existing data (order matters due to foreign keys)
     print("Clearing existing data...")
-    db.query(models.Sale).delete()
-    db.query(models.Order).delete()
-    db.query(models.User).delete()
-    db.commit()
+    try:
+        # Delete in correct order to respect foreign key constraints
+        db.query(models.Sale).delete()
+        db.commit()
+        print("  ✓ Sales deleted")
+        
+        db.query(models.Order).delete()
+        db.commit()
+        print("  ✓ Orders deleted")
+        
+        db.query(models.User).delete()
+        db.commit()
+        print("  ✓ Users deleted")
+    except Exception as e:
+        print(f"  ⚠ Error clearing data: {e}")
+        db.rollback()
+        # Try alternative method
+        try:
+            db.execute("DELETE FROM sales")
+            db.execute("DELETE FROM orders")
+            db.execute("DELETE FROM users")
+            db.commit()
+            print("  ✓ Data cleared using raw SQL")
+        except Exception as e2:
+            print(f"  ❌ Failed to clear data: {e2}")
+            db.rollback()
 
     # Create users with proper first and last names
     print("Creating users...")
