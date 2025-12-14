@@ -30,3 +30,16 @@ class Sale(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     order = relationship("Order")
+
+
+class SupportTicket(Base):
+    __tablename__ = "support_tickets"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    description = Column(String)
+    status = Column(String, default="open")  # open, in_progress, resolved, closed
+    priority = Column(String, default="medium")  # low, medium, high, urgent
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    external_id = Column(String, nullable=True)  # GitHub Issue ID, Trello ID, etc.
+    external_url = Column(String, nullable=True)  # Link to external ticket

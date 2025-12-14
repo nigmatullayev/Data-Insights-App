@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Insights App - Chat with Data</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Data Insights App</h1>
+            <p class="subtitle">Chat with your data using AI</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Chat Section -->
+            <div class="chat-section">
+                <div class="chat-header">
+                    <h2>💬 Chat</h2>
+                    <button class="btn btn-secondary" id="createTicketBtn">Create Support Ticket</button>
+                </div>
+                
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        <div class="message-content">
+                            <strong>Bot:</strong> Salom! Men sizning ma'lumotlar bazangiz bilan ishlashda yordam beraman. 
+                            Savol bering, masalan: "Nechta foydalanuvchi bor?" yoki "Oxirgi 10 ta buyurtma"
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-input-container">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Savolingizni kiriting..."
+                        class="chat-input"
+                    >
+                    <button id="sendBtn" class="btn btn-primary">Send</button>
+                </div>
+            </div>
+
+            <!-- Visualization Section -->
+            <div class="visualization-section">
+                <h2>📈 Visualization</h2>
+                <div id="visualizationContainer">
+                    <div class="placeholder">
+                        <p>Savol bering va natijalar bu yerda ko'rsatiladi</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Support Ticket Modal -->
+        <div id="ticketModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Create Support Ticket</h2>
+                <form id="ticketForm">
+                    <div class="form-group">
+                        <label for="ticketTitle">Title:</label>
+                        <input type="text" id="ticketTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticketDescription">Description:</label>
+                        <textarea id="ticketDescription" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticketPriority">Priority:</label>
+                        <select id="ticketPriority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                            <option value="urgent">Urgent</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticketIntegration">Integrate with (optional):</label>
+                        <select id="ticketIntegration">
+                            <option value="">None</option>
+                            <option value="github">GitHub Issues</option>
+                            <option value="trello">Trello</option>
+                            <option value="jira">Jira</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Ticket</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
