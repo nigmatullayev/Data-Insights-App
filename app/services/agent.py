@@ -38,30 +38,49 @@ def format_response_for_visualization(result: Any, tool_name: str) -> Dict[str, 
         "visualization": None
     }
     
-    if tool_name == "get_row_count":
-        # Simple number - can show as stat card
+    # Stat cards (single number)
+    if tool_name in ["get_row_count", "get_average_order_value"]:
+        if isinstance(result, dict):
+            # For dict results, show first value
+            value = list(result.values())[0] if result else 0
+        else:
+            value = result
         response["visualization"] = {
             "type": "stat",
-            "value": result
+            "value": value
         }
-    elif tool_name == "get_recent_records":
-        # Table data
+    
+    # Table data (lists)
+    elif tool_name in ["get_recent_records", "get_user_orders", "get_top_products", 
+                       "get_sales_by_product", "search_orders", "get_orders_by_date_range"]:
         if isinstance(result, list) and len(result) > 0:
             response["visualization"] = {
                 "type": "table",
                 "data": result,
                 "columns": list(result[0].keys()) if result else []
             }
-    elif tool_name == "get_sales_stats":
-        # Can show as bar chart or pie chart
+    
+    # Charts (dictionaries with multiple values)
+    elif tool_name in ["get_sales_stats", "get_user_stats", "get_order_stats", 
+                       "get_revenue_by_period", "get_user_by_id"]:
         if isinstance(result, dict):
-            response["visualization"] = {
-                "type": "chart",
-                "chart_type": "bar",  # or "pie"
-                "data": result,
-                "labels": list(result.keys()),
-                "values": list(result.values())
-            }
+            # Filter out non-numeric values for charts
+            numeric_data = {k: v for k, v in result.items() if isinstance(v, (int, float))}
+            if len(numeric_data) > 0:
+                response["visualization"] = {
+                    "type": "chart",
+                    "chart_type": "bar",
+                    "data": result,
+                    "labels": list(numeric_data.keys()),
+                    "values": list(numeric_data.values())
+                }
+            else:
+                # If no numeric data, show as table
+                response["visualization"] = {
+                    "type": "table",
+                    "data": [result],
+                    "columns": list(result.keys())
+                }
     
     return response
 
@@ -148,10 +167,199 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": "get_sales_stats",
-                    "description": "Get aggregated sales statistics including total sales, average sales, and maximum sale. Use this when user asks 'Savdo statistikasi', 'Daromad ma'lumotlari', 'Savdo ko'rsatkichlari' or similar questions about sales statistics.",
+                    "description": "Get aggregated sales statistics including total sales, average sales, maximum and minimum sale. Use this when user asks 'Savdo statistikasi', 'Daromad ma'lumotlari', 'Savdo ko'rsatkichlari' or similar questions about sales statistics.",
                     "parameters": {
                         "type": "object",
                         "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_user_stats",
+                    "description": "Get user statistics including total users, users with orders, users without orders. Use this when user asks 'Foydalanuvchilar statistikasi', 'Nechta foydalanuvchi buyurtma bergan?', 'Foydalanuvchilar haqida ma'lumot' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_order_stats",
+                    "description": "Get order statistics including total orders, total amount, average amount, max and min amounts. Use this when user asks 'Buyurtmalar statistikasi', 'Jami buyurtma summasi', 'O'rtacha buyurtma qiymati' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_top_products",
+                    "description": "Get top products by order count. Use this when user asks 'Eng ko'p sotilgan mahsulotlar', 'Top 10 mahsulot', 'Qaysi mahsulot ko'p sotilgan?' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "limit": {
+                                "type": "integer",
+                                "default": 10,
+                                "minimum": 1,
+                                "maximum": 50,
+                                "description": "Number of top products to return"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_user_orders",
+                    "description": "Get orders for a specific user by user ID. Use this when user asks 'Foydalanuvchi buyurtmalari', 'ID 5 foydalanuvchining buyurtmalari', 'Foydalanuvchi nechta buyurtma bergan?' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "integer",
+                                "description": "User ID (foydalanuvchi ID raqami)"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "default": 10,
+                                "minimum": 1,
+                                "maximum": 100,
+                                "description": "Number of orders to return"
+                            }
+                        },
+                        "required": ["user_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_average_order_value",
+                    "description": "Get average order value. Use this when user asks 'O'rtacha buyurtma qiymati', 'Bir buyurtmaning o'rtacha summasi' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_sales_by_product",
+                    "description": "Get sales statistics grouped by product. Use this when user asks 'Mahsulot bo'yicha savdo', 'Qaysi mahsulot ko'p daromad keltiradi?', 'Mahsulotlar daromadi' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "limit": {
+                                "type": "integer",
+                                "default": 10,
+                                "minimum": 1,
+                                "maximum": 50,
+                                "description": "Number of products to return"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "search_orders",
+                    "description": "Search orders by product name or amount range. Use this when user asks 'Mahsulot bo'yicha qidirish', '100 dollardan yuqori buyurtmalar', 'Laptop buyurtmalari' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "product": {
+                                "type": "string",
+                                "description": "Product name to search (mahsulot nomi)"
+                            },
+                            "min_amount": {
+                                "type": "number",
+                                "description": "Minimum order amount (minimal buyurtma summasi)"
+                            },
+                            "max_amount": {
+                                "type": "number",
+                                "description": "Maximum order amount (maksimal buyurtma summasi)"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "default": 20,
+                                "minimum": 1,
+                                "maximum": 100,
+                                "description": "Number of results to return"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_user_by_id",
+                    "description": "Get user information by user ID including name, email, order count, total spent. Use this when user asks 'Foydalanuvchi ma'lumotlari', 'ID 5 foydalanuvchi kim?', 'Foydalanuvchi necha pul sarflagan?' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "user_id": {
+                                "type": "integer",
+                                "description": "User ID (foydalanuvchi ID raqami)"
+                            }
+                        },
+                        "required": ["user_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_revenue_by_period",
+                    "description": "Get revenue statistics for the last N days. Use this when user asks 'Oxirgi 30 kunlik daromad', 'Haftalik daromad', 'So'nggi oy statistikasi' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "days": {
+                                "type": "integer",
+                                "default": 30,
+                                "minimum": 1,
+                                "maximum": 365,
+                                "description": "Number of days to look back (necha kun oldin)"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_orders_by_date_range",
+                    "description": "Get orders within a specific date range. Use this when user asks '2024 yil buyurtmalari', 'Sana oralig'idagi buyurtmalar', 'Oxirgi hafta buyurtmalari' or similar questions.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "start_date": {
+                                "type": "string",
+                                "description": "Start date in ISO format (boshlanish sanasi, masalan: 2024-01-01)"
+                            },
+                            "end_date": {
+                                "type": "string",
+                                "description": "End date in ISO format (tugash sanasi, masalan: 2024-12-31)"
+                            },
+                            "limit": {
+                                "type": "integer",
+                                "default": 50,
+                                "minimum": 1,
+                                "maximum": 200,
+                                "description": "Number of orders to return"
+                            }
+                        }
                     }
                 }
             }
