@@ -7,6 +7,7 @@ from app.api.chat import router as chat_router
 from app.api.data import router as data_router
 from app.api.ticket import router as ticket_router
 from app.api.tools import router as tools_router
+from app.api.health import router as health_router
 
 app = FastAPI(
     title="Data Insights App",
@@ -33,6 +34,7 @@ except Exception:
 Base.metadata.create_all(bind=engine)
 
 # Include routers
+app.include_router(health_router, prefix="/api", tags=["Health"])
 app.include_router(chat_router, prefix="/api", tags=["Chat"])
 app.include_router(data_router, prefix="/api", tags=["Data"])
 app.include_router(ticket_router, prefix="/api", tags=["Tickets"])

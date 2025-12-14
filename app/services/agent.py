@@ -1,13 +1,34 @@
 import json
+import logging
 from cerebras.cloud.sdk import Cerebras
 from app.services import tools
 from app.core.config import settings
 from app.core.safety import validate_table_name, sanitize_input
 from typing import Dict, Any, Optional
 
-client = Cerebras(
-    api_key=settings.CEREBRAS_API_KEY
-)
+logger = logging.getLogger(__name__)
+
+# Initialize client with error handling
+def get_cerebras_client():
+    """
+    Get or create Cerebras client with proper error handling
+    """
+    if not settings.CEREBRAS_API_KEY:
+        raise ValueError("CEREBRAS_API_KEY is not set in environment variables")
+    
+    try:
+        client = Cerebras(api_key=settings.CEREBRAS_API_KEY)
+        return client
+    except Exception as e:
+        logger.error(f"Failed to initialize Cerebras client: {str(e)}")
+        raise ValueError(f"Failed to initialize Cerebras client: {str(e)}")
+
+# Initialize client at module level
+try:
+    client = get_cerebras_client()
+except Exception as e:
+    logger.warning(f"Could not initialize Cerebras client at startup: {str(e)}")
+    client = None
 
 def format_response_for_visualization(result: Any, tool_name: str) -> Dict[str, Any]:
     """
@@ -53,8 +74,32 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
     Only function calling allowed.
     """
     try:
+        # Check if client is initialized
+        if client is None:
+            try:
+                global client
+                client = get_cerebras_client()
+            except Exception as e:
+                return {
+                    "error": f"Cerebras API client is not available: {str(e)}",
+                    "message": "Please check your CEREBRAS_API_KEY in .env file"
+                }
+        
+        # Check API key
+        if not settings.CEREBRAS_API_KEY:
+            return {
+                "error": "CEREBRAS_API_KEY is not configured",
+                "message": "Please set CEREBRAS_API_KEY in your .env file"
+            }
+        
         # Sanitize input
         sanitized_message = sanitize_input(message)
+        
+        if not sanitized_message:
+            return {
+                "error": "Empty or invalid message",
+                "message": "Please provide a valid question"
+            }
         
         tools_schema = [
             {
@@ -110,23 +155,50 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
             }
         ]
 
-        response = client.chat.completions.create(
-            model="llama-3.3-70b",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a data analytics assistant. "
-                        "You must NOT access database directly. "
-                        "You must use provided tools to answer questions. "
-                        "Always provide clear and helpful responses based on the data you receive."
-                    )
-                },
-                {"role": "user", "content": sanitized_message}
-            ],
-            tools=tools_schema,
-            tool_choice="auto"
-        )
+        try:
+            response = client.chat.completions.create(
+                model="llama-3.3-70b",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a data analytics assistant. "
+                            "You must NOT access database directly. "
+                            "You must use provided tools to answer questions. "
+                            "Always provide clear and helpful responses based on the data you receive."
+                        )
+                    },
+                    {"role": "user", "content": sanitized_message}
+                ],
+                tools=tools_schema,
+                tool_choice="auto"
+            )
+        except Exception as api_error:
+            error_msg = str(api_error)
+            logger.error(f"Cerebras API error: {error_msg}")
+            
+            # Provide more specific error messages
+            if "Connection" in error_msg or "connection" in error_msg.lower():
+                return {
+                    "error": "Connection error with Cerebras API",
+                    "message": "Please check your internet connection and API key. If the problem persists, the API service might be temporarily unavailable.",
+                    "details": "Unable to connect to Cerebras API service"
+                }
+            elif "401" in error_msg or "Unauthorized" in error_msg or "authentication" in error_msg.lower():
+                return {
+                    "error": "Authentication failed",
+                    "message": "Invalid API key. Please check your CEREBRAS_API_KEY in .env file"
+                }
+            elif "429" in error_msg or "rate limit" in error_msg.lower():
+                return {
+                    "error": "Rate limit exceeded",
+                    "message": "Too many requests. Please wait a moment and try again."
+                }
+            else:
+                return {
+                    "error": f"API error: {error_msg}",
+                    "message": "An error occurred while processing your request. Please try again."
+                }
 
         msg = response.choices[0].message
 
@@ -175,8 +247,16 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
             "tool_used": None
         }
     
-    except Exception as e:
+    except ValueError as ve:
         return {
-            "error": f"Error processing request: {str(e)}",
-            "message": "Please try again or contact support if the issue persists."
+            "error": str(ve),
+            "message": "Configuration error. Please check your settings."
+        }
+    except Exception as e:
+        error_msg = str(e)
+        logger.error(f"Unexpected error in chat_with_agent: {error_msg}")
+        return {
+            "error": f"Error processing request: {error_msg}",
+            "message": "Please try again or contact support if the issue persists.",
+            "type": type(e).__name__
         }
