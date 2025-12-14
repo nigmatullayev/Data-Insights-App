@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:8000/api';
+// Auto-detect API base URL based on current host
+const API_BASE_URL = window.location.origin + '/api';
 
 // DOM Elements
 const chatMessages = document.getElementById('chatMessages');
