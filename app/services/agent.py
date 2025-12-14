@@ -17,18 +17,16 @@ def get_cerebras_client():
         raise ValueError("CEREBRAS_API_KEY is not set in environment variables")
     
     try:
+        # Use the same pattern as Cerebras documentation
         client = Cerebras(api_key=settings.CEREBRAS_API_KEY)
         return client
     except Exception as e:
         logger.error(f"Failed to initialize Cerebras client: {str(e)}")
         raise ValueError(f"Failed to initialize Cerebras client: {str(e)}")
 
-# Initialize client at module level
-try:
-    client = get_cerebras_client()
-except Exception as e:
-    logger.warning(f"Could not initialize Cerebras client at startup: {str(e)}")
-    client = None
+# Initialize client at module level (lazy initialization)
+# Don't initialize at startup to avoid errors if API key is missing
+client = None
 
 def format_response_for_visualization(result: Any, tool_name: str) -> Dict[str, Any]:
     """
@@ -73,11 +71,12 @@ def chat_with_agent(message: str, db) -> Dict[str, Any]:
     LLM NEVER sees database.
     Only function calling allowed.
     """
+    global client
+    
     try:
         # Check if client is initialized
         if client is None:
             try:
-                global client
                 client = get_cerebras_client()
             except Exception as e:
                 return {
